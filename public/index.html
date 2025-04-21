@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Quotation System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <style>
+        .flight-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .section-title {
+            color: #0d6efd;
+            margin-bottom: 20px;
+        }
+        .btn-add {
+            margin: 10px 0;
+        }
+        .form-label {
+            font-weight: 500;
+        }
+        #downloadBtn {
+            padding: 10px 25px;
+            font-size: 1.1rem;
+            margin-top: 20px;
+        }
+        /* Modern title styles */
+        .modern-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #005DA0, #00A4E4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            position: relative;
+        }
+        .modern-title2 {
+            font-size: 1rem;
+            font-weight: 200;
+            background: linear-gradient(135deg, #005DA0, #00A4E4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            position: relative;
+        }
+        .modern-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #005DA0, #00A4E4);
+            border-radius: 2px;
+        }
+        @media (max-width: 768px) {
+            .modern-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="modern-title">Flight Quotation System</h1>
+        <h1 class="modern-title2">Developed By Qgo Group Development Department</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="customerName" class="form-label">Customer Name</label>
+                <input type="text" class="form-control" id="customerName" placeholder="Enter customer name">
+            </div>
+        </div>
+        
+        <div id="flightGroups">
+            <!-- Flight groups will be added here -->
+        </div>
+        
+        <button type="button" class="btn btn-primary btn-add" id="addAirlineBtn">
+            <i class="bi bi-plus-circle"></i> Add Another Airline
+        </button>
+        
+        <div class="text-center mt-4">
+            <button id="downloadBtn" class="btn btn-success">
+                <i class="bi bi-download"></i> Download as PDF
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize date pickers
+            flatpickr(".date-picker", { dateFormat: "Y-m-d" });
+            
+            // Add first airline group by default
+            addAirlineGroup();
+            
+            // Event listeners
+            document.getElementById('addAirlineBtn').addEventListener('click', addAirlineGroup);
+            document.getElementById('downloadBtn').addEventListener('click', generateDocument);
+            
+            // Fetch airports data
+            fetch('/airports')
+                .then(response => response.json())
+                .then(data => {
+                    window.airports = data;
+                });
+        });
+        
+        function addAirlineGroup() {
+            const groupId = Date.now();
+            const flightGroups = document.getElementById('flightGroups');
+            
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'flight-card';
+            groupDiv.dataset.groupId = groupId;
+            
+            groupDiv.innerHTML = `
+                <h3 class="section-title">Airline Details</h3>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="airline-${groupId}" class="form-label">Airline</label>
+                        <select class="form-select" id="airline-${groupId}">
+                            <option value="Jazeera">Jazeera</option>
+                            <option value="Air India Express">Air India Express</option>
+                            <option value="IndiGo">IndiGo</option>
+                            <option value="Emirates">Emirates</option>
+                            <option value="Qatar Airways">Qatar Airways</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flights-container" id="flights-${groupId}">
+                    <!-- Flight entries will be added here -->
+                </div>
+                
+                <button type="button" class="btn btn-outline-primary btn-add" onclick="addFlightEntry(${groupId})">
+                    <i class="bi bi-plus-circle"></i> Add Flight
+                </button>
+                
+                <h4 class="section-title mt-4">Additional Information</h4>
+                
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="ticketFare-${groupId}" class="form-label">Ticket Fare (KD)</label>
+                        <input type="number" step="0.001" class="form-control" id="ticketFare-${groupId}" value="0.000">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="baggagePieces-${groupId}" class="form-label">Baggage Allowance (pieces)</label>
+                        <input type="number" class="form-control" id="baggagePieces-${groupId}" value="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="baggageKg-${groupId}" class="form-label">Baggage Allowance (kg per piece)</label>
+                        <input type="number" class="form-control" id="baggageKg-${groupId}" value="0">
+                    </div>
+                </div>
+                
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="changeNoPenalty-${groupId}">
+                            <label class="form-check-label" for="changeNoPenalty-${groupId}">
+                                No penalty, only fare difference to charge if any
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="changeNoShowFee-${groupId}" class="form-label">Change for no show (KWD)</label>
+                        <input type="number" step="0.001" class="form-control" id="changeNoShowFee-${groupId}" value="0.000">
+                    </div>
+                </div>
+                
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4">
+                        <label for="cancellationFee-${groupId}" class="form-label">Cancellation Fee (KWD)</label>
+                        <input type="number" step="0.001" class="form-control" id="cancellationFee-${groupId}" value="0.000">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="noShowFee-${groupId}" class="form-label">No Show Fee (KWD)</label>
+                        <input type="number" step="0.001" class="form-control" id="noShowFee-${groupId}" value="0.000">
+                    </div>
+                </div>
+            `;
+            
+            flightGroups.appendChild(groupDiv);
+            addFlightEntry(groupId);
+        }
+        
+        function addFlightEntry(groupId) {
+            const flightsContainer = document.getElementById(`flights-${groupId}`);
+            const flightId = Date.now();
+            
+            const flightDiv = document.createElement('div');
+            flightDiv.className = 'flight-entry row g-3 mb-3';
+            flightDiv.dataset.flightId = flightId;
+            
+            flightDiv.innerHTML = `
+                <div class="col-md-2">
+                    <label for="flightNumber-${groupId}-${flightId}" class="form-label">Flight Number</label>
+                    <input type="text" class="form-control" id="flightNumber-${groupId}-${flightId}" placeholder="Flight number">
+                </div>
+                <div class="col-md-2">
+                    <label for="class-${groupId}-${flightId}" class="form-label">Class</label>
+                    <select class="form-select" id="class-${groupId}-${flightId}">
+                        <option value="Economy">Economy</option>
+                        <option value="Business">Business</option>
+                        <option value="First">First</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="date-${groupId}-${flightId}" class="form-label">Date</label>
+                    <input type="text" class="form-control date-picker" id="date-${groupId}-${flightId}">
+                </div>
+                <div class="col-md-2">
+                    <label for="from-${groupId}-${flightId}" class="form-label">From</label>
+                    <input type="text" class="form-control" id="from-${groupId}-${flightId}" list="airportsList">
+                </div>
+                <div class="col-md-2">
+                    <label for="to-${groupId}-${flightId}" class="form-label">To</label>
+                    <input type="text" class="form-control" id="to-${groupId}-${flightId}" list="airportsList">
+                </div>
+                <div class="col-md-1">
+                    <label for="depart-${groupId}-${flightId}" class="form-label">Depart</label>
+                    <input type="time" class="form-control" id="depart-${groupId}-${flightId}">
+                </div>
+                <div class="col-md-1">
+                    <label for="arrival-${groupId}-${flightId}" class="form-label">Arrival</label>
+                    <input type="time" class="form-control" id="arrival-${groupId}-${flightId}">
+                </div>
+                <div class="col-md-2">
+                    <label for="baggage-${groupId}-${flightId}" class="form-label">Baggage (kg)</label>
+                    <input type="number" class="form-control" id="baggage-${groupId}-${flightId}" value="0">
+                </div>
+                <div class="col-md-12 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFlightEntry(${groupId}, ${flightId})">
+                        Remove
+                    </button>
+                </div>
+            `;
+            
+            flightsContainer.appendChild(flightDiv);
+            
+            // Initialize date picker for this flight
+            flatpickr(`#date-${groupId}-${flightId}`, { dateFormat: "Y-m-d" });
+            
+            // Create datalist for airports if it doesn't exist
+            if (!document.getElementById('airportsList')) {
+                const datalist = document.createElement('datalist');
+                datalist.id = 'airportsList';
+                
+                if (window.airports && window.airports.length > 0) {
+                    window.airports.forEach(airport => {
+                        const option = document.createElement('option');
+                        option.value = airport;
+                        datalist.appendChild(option);
+                    });
+                }
+                
+                document.body.appendChild(datalist);
+            }
+        }
+        
+        function removeFlightEntry(groupId, flightId) {
+            const flightEntry = document.querySelector(`.flight-entry[data-flight-id="${flightId}"]`);
+            if (flightEntry) {
+                flightEntry.remove();
+            }
+        }
+        
+        function generateDocument() {
+            const customerName = document.getElementById('customerName').value;
+            const flightGroups = [];
+            
+            document.querySelectorAll('.flight-card').forEach(group => {
+                const groupId = group.dataset.groupId;
+                const airline = document.getElementById(`airline-${groupId}`).value;
+                
+                const flights = [];
+                group.querySelectorAll('.flight-entry').forEach(flight => {
+                    const flightId = flight.dataset.flightId;
+                    
+                    flights.push({
+                        flightNumber: document.getElementById(`flightNumber-${groupId}-${flightId}`).value,
+                        class: document.getElementById(`class-${groupId}-${flightId}`).value,
+                        date: document.getElementById(`date-${groupId}-${flightId}`).value,
+                        from: document.getElementById(`from-${groupId}-${flightId}`).value,
+                        to: document.getElementById(`to-${groupId}-${flightId}`).value,
+                        depart: document.getElementById(`depart-${groupId}-${flightId}`).value,
+                        arrival: document.getElementById(`arrival-${groupId}-${flightId}`).value,
+                        baggage: document.getElementById(`baggage-${groupId}-${flightId}`).value
+                    });
+                });
+                
+                const additionalInfo = {
+                    ticketFare: document.getElementById(`ticketFare-${groupId}`).value,
+                    baggagePieces: document.getElementById(`baggagePieces-${groupId}`).value,
+                    baggageKg: document.getElementById(`baggageKg-${groupId}`).value,
+                    changeNoPenalty: document.getElementById(`changeNoPenalty-${groupId}`).checked,
+                    changeNoShowFee: document.getElementById(`changeNoShowFee-${groupId}`).value,
+                    cancellationFee: document.getElementById(`cancellationFee-${groupId}`).value,
+                    noShowFee: document.getElementById(`noShowFee-${groupId}`).value
+                };
+                
+                flightGroups.push({
+                    airline,
+                    flights,
+                    additionalInfo
+                });
+            });
+            
+            const data = {
+                customerName,
+                flights: flightGroups
+            };
+            
+            // Send data to server for PDF generation
+            fetch('/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `data=${encodeURIComponent(JSON.stringify(data))}`
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                saveAs(blob, 'flight_quotation.pdf');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error generating PDF: ' + error.message);
+            });
+        }
+    </script>
+</body>
+</html>
