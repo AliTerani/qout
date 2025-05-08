@@ -79,8 +79,15 @@
         
         <div class="row mb-4">
             <div class="col-md-6">
-                <label for="customerName" class="form-label">Customer Name</label>
-                <input type="text" class="form-control" id="customerName" placeholder="Enter customer name">
+                <label for="customerName" class="form-label">Corporate Name</label>
+                <select class="form-select" id="customerName">
+                    <option value="">Select the Corporate</option>
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="customerAccount" class="form-label">Account Number</label>
+                <input type="text" class="form-control" id="customerAccount" readonly>
             </div>
         </div>
         
@@ -123,6 +130,30 @@
                 .then(data => {
                     window.airports = data;
                 });
+
+            fetch('/corp-names')
+            .then(response => response.json())
+            .then(data => {
+                const customerSelect = document.getElementById('customerName');
+                
+                // Sort corp names alphabetically
+                data.sort((a, b) => a.CORPNAME.localeCompare(b.CORPNAME));
+                
+                // Populate dropdown
+                data.forEach(corp => {
+                    const option = document.createElement('option');
+                    option.value = corp.CORPNAME;
+                    option.textContent = corp.CORPNAME;
+                    option.dataset.account = corp.CORPACCT;
+                    customerSelect.appendChild(option);
+                });
+                
+                // Add event listener for selection changes
+                customerSelect.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    document.getElementById('customerAccount').value = selectedOption.dataset.account || '';
+                });
+            });
         });
         
         function addAirlineGroup() {
@@ -147,7 +178,12 @@
                             <option value="Qatar Airways">Qatar Airways</option>
                         </select>
                     </div>
+                     <div class="col-md-4">
+                        <label for="paxName-${groupId}" class="form-label">Pax Name</label>
+                        <input type="text" class="form-control" id="paxName-${groupId}" placeholder="Passenger name">
+                    </div>
                 </div>
+                
                 
                 <div class="flights-container" id="flights-${groupId}">
                     <!-- Flight entries will be added here -->
@@ -288,6 +324,7 @@
         
         function generateDocument() {
             const customerName = document.getElementById('customerName').value;
+            const customerAccount = document.getElementById('customerAccount').value;
             const flightGroups = [];
             
             document.querySelectorAll('.flight-card').forEach(group => {
@@ -322,6 +359,7 @@
                 
                 flightGroups.push({
                     airline,
+                    paxName: document.getElementById(`paxName-${groupId}`).value, // Add this line
                     flights,
                     additionalInfo
                 });
@@ -329,6 +367,7 @@
             
             const data = {
                 customerName,
+                customerAccount, // Add this line
                 flights: flightGroups
             };
             
